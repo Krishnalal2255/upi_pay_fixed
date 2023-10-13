@@ -191,7 +191,7 @@ class _ScreenState extends State<Screen> {
                       .textTheme
                       .button!
                       .copyWith(color: Colors.white)),
-              color: Theme.of(context).accentColor,
+              color: Theme.of(context).colorScheme.secondary,
               height: 48,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(6)),
