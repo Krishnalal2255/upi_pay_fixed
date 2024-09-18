@@ -2,6 +2,12 @@ group 'com.drenther.upi_pay'
 version '1.0-SNAPSHOT'
 
 buildscript {
+    ext {
+
+
+        agp_version2 = '7.4.2'
+
+    }
     ext.kotlin_version = '1.5.20'
     repositories {
         google()
@@ -9,7 +15,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.android.tools.build:gradle:4.1.0'
+        classpath "com.android.tools.build:gradle:$agp_version2"
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
@@ -25,8 +31,8 @@ apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
 
 android {
-    compileSdkVersion 30
-
+    compileSdkVersion 33
+    namespace "com.upi_pay.app"
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
