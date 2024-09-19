@@ -15,7 +15,7 @@ class App extends StatelessWidget {
           title: Text('UPI Pay'),
         ),
         body: Screen(),
-      ),
+      ), 
     );
   }
 }
