@@ -9,26 +9,55 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.PluginRegistry.ActivityResultListener
-import io.flutter.plugin.common.PluginRegistry.Registrar
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
+import io.flutter.plugin.common.PluginRegistry
 import java.io.ByteArrayOutputStream
 
-class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel) : ActivityResultListener, MethodChannel.MethodCallHandler {
-    private val activity: Activity? = registrar.activity()
-
-    private var result: MethodChannel.Result? = null
+class UpiPayPlugin : FlutterPlugin, MethodCallHandler, PluginRegistry.ActivityResultListener {
+    private lateinit var channel: MethodChannel
+    private var activity: Activity? = null
+    private var result: Result? = null
     private var requestCodeNumber = 201119
-    var hasResponded = false
+    private var hasResponded = false
 
-   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel = MethodChannel(binding.binaryMessenger, "upi_pay")
+        channel.setMethodCallHandler(this)
+    }
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+    }
+
+    override fun onAttachedToActivity(binding: PluginRegistry.ActivityPluginBinding) {
+        activity = binding.activity
+        binding.addActivityResultListener(this)
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: PluginRegistry.ActivityPluginBinding) {
+        activity = binding.activity
+    }
+
+    override fun onMethodCall(call: MethodCall, result: Result) {
         hasResponded = false
         this.result = result
 
         when (call.method) {
-            "initiateTransaction" -> this.initiateTransaction(call)
-            "getInstalledUpiApps" -> this.getInstalledUpiApps()
+            "initiateTransaction" -> initiateTransaction(call)
+            "getInstalledUpiApps" -> getInstalledUpiApps()
             else -> result.notImplemented()
         }
     }
@@ -45,36 +74,36 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
         val url: String? = call.argument("url")
 
         try {
-            var uriStr: String? = "upi://pay?pa=" + pa +
-                    "&pn=" + Uri.encode(pn) +
-                    "&tr=" + Uri.encode(tr) +
-                    "&am=" + Uri.encode(am) +
-                    "&cu=" + Uri.encode(cu)
+            var uriStr: String = "upi://pay?pa=$pa" +
+                    "&pn=${Uri.encode(pn)}" +
+                    "&tr=${Uri.encode(tr)}" +
+                    "&am=${Uri.encode(am)}" +
+                    "&cu=${Uri.encode(cu)}"
             if (url != null) {
-                uriStr += ("&url=" + Uri.encode(url))
+                uriStr += "&url=${Uri.encode(url)}"
             }
             if (mc != null) {
-                uriStr += ("&mc=" + Uri.encode(mc))
+                uriStr += "&mc=${Uri.encode(mc)}"
             }
             if (tn != null) {
-                uriStr += ("&tn=" + Uri.encode(tn))
+                uriStr += "&tn=${Uri.encode(tn)}"
             }
-            uriStr += "&mode=00" // &orgid=000000"
+            uriStr += "&mode=00"
             val uri = Uri.parse(uriStr)
 
             val intent = Intent(Intent.ACTION_VIEW, uri)
             intent.setPackage(app)
 
             val packageManager: PackageManager = activity!!.packageManager
-            if (intent.resolveActivity(activity!!.packageManager) == null) {
-                this.success("activity_unavailable")
+            if (intent.resolveActivity(packageManager) == null) {
+                success("activity_unavailable")
                 return
             }
 
             activity!!.startActivityForResult(intent, requestCodeNumber)
         } catch (ex: Exception) {
             Log.e("upi_pay", ex.toString())
-            this.success("failed_to_open_app")
+            success("failed_to_open_app")
         }
     }
 
@@ -85,28 +114,22 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
         val uri = uriBuilder.build()
         val intent = Intent(Intent.ACTION_VIEW, uri)
 
-        // Check if the activity is not null before proceeding
         if (activity == null) {
             result?.error("getInstalledUpiApps", "activity_unavailable", null)
             return
         }
 
-        val packageManager: PackageManager = activity.packageManager
+        val packageManager: PackageManager = activity!!.packageManager
 
         try {
             val activities = packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY)
 
-            // Convert the activities into a response that can be transferred over the channel.
             val activityResponse = activities.map {
                 val packageName = it.activityInfo.packageName
                 val drawable = packageManager.getApplicationIcon(packageName)
 
                 val bitmap = getBitmapFromDrawable(drawable)
-                val icon = if (bitmap != null) {
-                    encodeToBase64(bitmap)
-                } else {
-                    null
-                }
+                val icon = bitmap?.let { encodeToBase64(it) }
 
                 mapOf(
                     "packageName" to packageName,
@@ -130,8 +153,7 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
     }
 
     private fun getBitmapFromDrawable(drawable: Drawable): Bitmap? {
-        val bmp: Bitmap =
-            Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
+        val bmp: Bitmap = Bitmap.createBitmap(drawable.intrinsicWidth, drawable.intrinsicHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         drawable.setBounds(0, 0, canvas.width, canvas.height)
         drawable.draw(canvas)
@@ -150,24 +172,14 @@ class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodCha
             if (data != null) {
                 try {
                     val response = data.getStringExtra("response") ?: "invalid_response"
-                    this.success(response)
+                    success(response)
                 } catch (ex: Exception) {
-                    this.success("invalid_response")
+                    success("invalid_response")
                 }
             } else {
-                this.success("user_cancelled")
+                success("user_cancelled")
             }
         }
         return true
-    }
-
-    companion object {
-        @JvmStatic
-        fun registerWith(registrar: Registrar) {
-            val channel = MethodChannel(registrar.messenger(), "upi_pay")
-            val plugin = UpiPayPlugin(registrar, channel)
-            registrar.addActivityResultListener(plugin)
-            channel.setMethodCallHandler(plugin)
-        }
     }
 }
