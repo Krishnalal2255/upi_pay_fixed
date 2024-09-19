@@ -16,13 +16,13 @@ import io.flutter.plugin.common.PluginRegistry.Registrar
 import java.io.ByteArrayOutputStream
 
 class UpiPayPlugin internal constructor(registrar: Registrar, channel: MethodChannel) : ActivityResultListener, MethodChannel.MethodCallHandler {
-    private val activity: Activsity? = registrar.activity()
+    private val activity: Activity? = registrar.activity()
 
     private var result: MethodChannel.Result? = null
     private var requestCodeNumber = 201119
     var hasResponded = false
 
-   fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+   override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         hasResponded = false
         this.result = result
 
