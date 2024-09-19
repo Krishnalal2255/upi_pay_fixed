@@ -11,14 +11,16 @@ import android.util.Base64
 import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import io.flutter.plugin.common.PluginRegistry
 import java.io.ByteArrayOutputStream
 
-class UpiPayPlugin : FlutterPlugin, MethodCallHandler, PluginRegistry.ActivityResultListener {
+class UpiPayPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private lateinit var channel: MethodChannel
     private var activity: Activity? = null
     private var result: Result? = null
@@ -34,9 +36,11 @@ class UpiPayPlugin : FlutterPlugin, MethodCallHandler, PluginRegistry.ActivityRe
         channel.setMethodCallHandler(null)
     }
 
-    override fun onAttachedToActivity(binding: PluginRegistry.ActivityPluginBinding) {
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding.activity
-        binding.addActivityResultListener(this)
+        binding.addActivityResultListener { requestCode, resultCode, data ->
+            onActivityResult(requestCode, resultCode, data)
+        }
     }
 
     override fun onDetachedFromActivity() {
@@ -47,7 +51,7 @@ class UpiPayPlugin : FlutterPlugin, MethodCallHandler, PluginRegistry.ActivityRe
         activity = null
     }
 
-    override fun onReattachedToActivityForConfigChanges(binding: PluginRegistry.ActivityPluginBinding) {
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
         activity = binding.activity
     }
 
@@ -167,7 +171,7 @@ class UpiPayPlugin : FlutterPlugin, MethodCallHandler, PluginRegistry.ActivityRe
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+    private fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCodeNumber == requestCode && result != null) {
             if (data != null) {
                 try {
